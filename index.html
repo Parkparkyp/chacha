@@ -1,0 +1,210 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>헤이딜러 일반 매입금액 계산기</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      margin: auto;
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 500px;
+      margin: auto;
+    }
+    h2 {
+      text-align: center;
+    }
+    input, select {
+      padding: 10px;
+      font-size: 16px;
+      margin-top: 10px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .row input[type="number"] {
+      flex: 2;
+    }
+    .row label {
+      flex: 1;
+      font-size: 14px;
+    }
+    .result {
+      margin-top: 20px;
+      line-height: 1.6;
+      background: #fff;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    .subtle {
+      color: #777;
+      font-style: italic;
+    }
+    .details { display: none; padding: 5px 0; }
+    .record:hover { cursor: pointer; background-color: #f0f0f0; }
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      input {
+        font-size: 14px;
+      }
+      .result {
+        font-size: 14px;
+        padding: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>중고차 매입금액 계산기</h2>
+    <select id="recordDate" onchange="loadSavedRecords(this.value)"></select>
+
+    <input type="text" id="carNumber" placeholder="차량번호 입력" oninput="calculate()" />
+    <input type="number" id="carPrice" placeholder="차량금액(만원) 입력" oninput="calculate()" />
+    <input type="number" id="customProfit" placeholder="목표 수익(만원) 입력 (선택)" oninput="calculate()" />
+
+    <input type="number" id="performanceCost" placeholder="성능비(만원) 입력" oninput="calculate()" />
+    <input type="number" id="deliveryCost" placeholder="탁송비(만원) 입력" oninput="calculate()" />
+
+    <div class="row">
+      <input type="number" id="exteriorCount" placeholder="외판 몇 판?" oninput="calculate()">
+      <label><input type="radio" name="brandType" value="국산" checked onclick="calculate()"> 국산차</label>
+      <label><input type="radio" name="brandType" value="수입" onclick="calculate()"> 수입차</label>
+    </div>
+
+    <div class="result" id="resultBox"></div>
+
+    <button onclick="saveRecord()" style="margin-top:10px; width:100%; padding:10px; font-size:16px;">🔒 저장하기</button>
+    <div class="result" id="savedRecords" style="margin-top:20px;"></div>
+  </div>
+
+  <script>
+    window.onload = function () {
+      loadSavedRecords();
+      calculate();
+    }
+
+    function calculate() {
+      const price = parseFloat(document.getElementById("carPrice").value);
+      const customProfit = parseFloat(document.getElementById("customProfit").value) || 0;
+      const exteriorCount = parseInt(document.getElementById("exteriorCount").value) || 0;
+      const brandType = document.querySelector('input[name="brandType"]:checked').value;
+      const performanceCost = parseFloat(document.getElementById("performanceCost").value) || 0;
+      const deliveryCost = parseFloat(document.getElementById("deliveryCost").value) || 0;
+      const carNumber = document.getElementById("carNumber").value || "-";
+
+      const polishing = 10;
+      const discount = 70;
+      const transferFee = 15.4;
+      const exteriorUnitCost = brandType === "수입" ? 12 : 8;
+      const exteriorCost = exteriorCount * exteriorUnitCost;
+      const profit = customProfit >= 0 ? customProfit : (price >= 5000 ? 500 : 250);
+
+      let tempTotal = price - polishing - performanceCost - deliveryCost - exteriorCost - discount - transferFee - profit;
+
+      function getBasicDeduction(amount) {
+        if (amount <= 100) return 14;
+        if (amount <= 500) return 30;
+        if (amount <= 1000) return 36.5;
+        if (amount <= 1500) return 36.5;
+        if (amount <= 3000) return 39.5;
+        if (amount <= 4000) return 47.5;
+        return 50.5;
+      }
+
+      const basicDeduction = getBasicDeduction(tempTotal);
+      const preTaxAmount = +(tempTotal - basicDeduction).toFixed(1);
+      const tax = preTaxAmount > 2850 ? +(preTaxAmount * 0.0096).toFixed(1) : 0;
+      const finalAmount = +(preTaxAmount - tax).toFixed(1);
+      const interest = +(finalAmount * 0.008).toFixed(1);
+
+      const result = `
+        <strong>차량금액:</strong> ${isNaN(price) ? 0 : price}만원<br>
+        <strong>기본 공제:</strong> ${basicDeduction}만원<br>
+        <strong>광택비용:</strong> ${polishing}만원<br>
+        <strong>성능비:</strong> ${performanceCost}만원<br>
+        <strong>탁송비:</strong> ${deliveryCost}만원<br>
+        <strong>외판비용(${brandType}):</strong> ${exteriorCost}만원<br>
+        <strong>할인:</strong> ${discount}만원<br>
+        <strong>판매 이전비:</strong> ${transferFee}만원<br>
+        <strong>취득세(0.96%):</strong> ${tax}만원<br>
+        <strong>목표 수익:</strong> ${profit}만원<br>
+        <strong>최종 매입금액:</strong> ${isNaN(finalAmount) ? 0 : finalAmount}만원<br>
+        <span class='subtle'><strong>재고 한달 이자(0.8%):</strong> ${interest}만원</span>`;
+
+      document.getElementById("resultBox").innerHTML = result;
+    }
+
+    function saveRecord() {
+      const today = new Date().toISOString().split('T')[0];
+      const storageKey = `records_${today}`;
+      const record = {
+        carNumber: document.getElementById("carNumber").value,
+        carPrice: document.getElementById("carPrice").value,
+        customProfit: document.getElementById("customProfit").value,
+        exteriorCount: document.getElementById("exteriorCount").value,
+        brandType: document.querySelector('input[name="brandType"]:checked').value,
+        performanceCost: document.getElementById("performanceCost").value,
+        deliveryCost: document.getElementById("deliveryCost").value
+      };
+      let records = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      records.push(record);
+      localStorage.setItem(storageKey, JSON.stringify(records));
+      loadSavedRecords();
+    }
+
+    function loadSavedRecords(date) {
+      const keys = Object.keys(localStorage).filter(k => k.startsWith('records_')).sort().reverse();
+      const selector = document.getElementById('recordDate');
+      selector.innerHTML = keys.map(k => `<option value="${k}">${k.replace('records_', '')}</option>`).join('');
+      const selectedKey = date || keys[0];
+      if (!selectedKey) {
+        document.getElementById("savedRecords").innerHTML = "<em>저장된 계산 없음</em>";
+        return;
+      }
+      selector.value = selectedKey;
+      const records = JSON.parse(localStorage.getItem(selectedKey) || "[]");
+      const box = document.getElementById("savedRecords");
+      if (records.length === 0) {
+        box.innerHTML = "<em>해당 날짜에 저장된 계산 없음</em>";
+        return;
+      }
+      box.innerHTML = `<strong>📋 ${selectedKey.replace('records_', '')} 계산 기록:</strong><br><br>`;
+      records.forEach((r, i) => {
+        const id = `details-${selectedKey}-${i}`;
+        box.innerHTML += `
+          <div class='record' onclick="document.getElementById('${id}').style.display = (document.getElementById('${id}').style.display === 'none' ? 'block' : 'none')">
+            ${i + 1}. 차량번호: ${r.carNumber || "-"}
+          </div>
+          <div class='details' id='${id}'>
+            차량금액: ${r.carPrice}만원<br>
+            목표수익: ${r.customProfit}만원<br>
+            외판: ${r.exteriorCount}판 (${r.brandType})<br>
+            성능비: ${r.performanceCost}만원<br>
+            탁송비: ${r.deliveryCost}만원<br>
+            <button onclick='deleteRecord(${i}, "${selectedKey}"); event.stopPropagation();'>❌ 삭제</button>
+          </div>`;
+      });
+    }
+
+    function deleteRecord(index, storageKey) {
+      let records = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      records.splice(index, 1);
+      localStorage.setItem(storageKey, JSON.stringify(records));
+      loadSavedRecords(storageKey);
+    }
+  </script>
+</body>
+</html>
